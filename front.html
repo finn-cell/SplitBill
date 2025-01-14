@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Splitter</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Expense Splitter</h1>
+
+    <h2>Add Expense</h2>
+    <form id="expense-form">
+        Payer: <input type="text" name="payer" required><br>
+        Amount: <input type="number" name="amount" required><br>
+        Item: <input type="text" name="item" required><br>
+        Participants: <input type="checkbox" name="participants" value="Alice"> Alice
+        <input type="checkbox" name="participants" value="Bob"> Bob
+        <input type="checkbox" name="participants" value="Charlie"> Charlie<br>
+        <button type="submit">Add Expense</button>
+    </form>
+
+    <h2>Balance Summary</h2>
+    <button id="get-balances">Get Balances</button>
+    <div id="balances"></div>
+
+    <script>
+        $('#expense-form').submit(function(event) {
+            event.preventDefault();
+            var data = $(this).serializeArray();
+            var participants = $("input[name='participants']:checked").map(function() {
+                return $(this).val();
+            }).get();
+
+            $.ajax({
+                url: '/add_expense',
+                method: 'POST',
+                data: {
+                    payer: data[0].value,
+                    amount: data[1].value,
+                    item: data[2].value,
+                    participants: participants
+                },
+                success: function(response) {
+                    alert(response.message);
+                }
+            });
+        });
+
+        $('#get-balances').click(function() {
+            $.get('/calculate_balances', function(data) {
+                var balances = '<ul>';
+                data.forEach(function(record) {
+                    balances += '<li>' + record.from + ' owes ' + record.to + ' ' + record.total_amount + ' for items: ' + record.detailed_items + '</li>';
+                });
+                balances += '</ul>';
+                $('#balances').html(balances);
+            });
+        });
+    </script>
+</body>
+</html>
