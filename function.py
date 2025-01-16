@@ -11,9 +11,8 @@ class ExpenseSplitter:
         self.digit = digit
         self.participants = participants
         # 初始化支出記錄，包含每位參與者的支出紀錄欄位
-        columns = ['payer', 'amount', 'item'] + participants + ['pay_' + name for name in participants]
+        columns = ['payer', 'amount', 'item'] + participants + ['receive_from_' + name for name in participants]
         self.expensesDf = pd.DataFrame(columns=columns)
-        self.billDf = pd.DataFrame(0, index=participants, columns=participants)
     
     def add_expense(self, payer, amount, item, participants):
         """
@@ -35,17 +34,20 @@ class ExpenseSplitter:
                 expenseData[participant] = [0]
         
         if self.digit == 0:
-            money = int(expenseData['amount'][0] / peopleCont)
+            if expenseData['amount'][0] % peopleCont != 0:
+                money = int(expenseData['amount'][0] / peopleCont) + 1
+            else:
+                money = int(expenseData['amount'][0] / peopleCont)
         else:
             money = round(expenseData['amount'][0] / peopleCont, self.digit)
 
         ### setting the participant and money relation
         for participant in self.participants:
             if participant in participants:
-                expenseData['pay_' + participant] = [money]
+                expenseData['receive_from_' + participant] = [money]
                 peopleCont += 1
             else:
-                expenseData['pay_' + participant] = [0]
+                expenseData['receive_from_' + participant] = [0]
 
         ### add this bill to DF
         self.expensesDf = pd.concat([self.expensesDf, pd.DataFrame(expenseData)], ignore_index=True)
@@ -66,27 +68,25 @@ class ExpenseSplitter:
         else:
             return ", ".join(f"{item}: {amount:.{self.digit}f}" for item, amount in itemsSummary.items())
             
-    def calculate_balances(self):
+    def make_bill_relation(self):
         """
         計算每位參與者的結餘
-        :return: 每位參與者的結餘 (dict)
+        :return: 每位參與者的結餘 (DataFrame)
         """
-        paymentsBlanceDf = pd.DataFrame()
-        for payer, tmpDf in self.expensesDf.groupby(['payer']):
-            for person in self.participants:
-                paymentsBlanceDf[person] = tmpDf[f"pay_{person}"].sum()
-
         ### 把錢 summary -> 誰 pay 誰 多少錢，有什麼 Item
         transactions = []
         for _, row in self.expensesDf.iterrows():
             payer = row["payer"]; item = row["item"]
             for person in self.participants:
-                amountToPay = row[f"pay_{person}"]
-                transactions.append({"from": person, "to": payer, "amount": amountToPay, "item": item})
+                if payer != person:
+                    amountToPay = row[f"receive_from_{person}"]
+                    transactions.append({"from": person, "to": payer, "amount": amountToPay, "item": item})
+        
         resultDf = pd.DataFrame(transactions)
         resultDf = resultDf[resultDf["amount"] > 0]
-        print(resultDf)
-        
+        return resultDf
+    
+    def cal_all_item_bill(self, resultDf):
         ### 把 Item 的錢列出來，方便驗算
         balanceDf = (
             resultDf.groupby(["from", "to"])
@@ -94,9 +94,36 @@ class ExpenseSplitter:
                 "total_amount": group["amount"].sum(),
                 "detailed_items": self.aggregate_items(group),
             })).reset_index()
-        )
+        )    
 
         return balanceDf
+    
+    def cal_simplified_balances(self, resultDf):
+        # 簡化交易：計算淨額
+        net_balances = {}
+        for _, row in resultDf.iterrows():
+            key = (row["from"], row["to"])
+            if key not in net_balances:
+                net_balances[key] = 0
+            net_balances[key] += row["amount"]
+
+        # 反向消除雙向交易
+        simplified_balances = []
+        for (payer, receiver), amount in net_balances.items():
+            reverse_key = (receiver, payer)
+            if reverse_key in net_balances:
+                if net_balances[reverse_key] > amount:
+                    net_balances[reverse_key] -= amount
+                    amount = 0
+                else:
+                    amount -= net_balances[reverse_key]
+                    net_balances[reverse_key] = 0
+            if amount > 0:
+                simplified_balances.append({"from": payer, "to": receiver, "amount": amount})
+
+        simplified_balances_df = pd.DataFrame(simplified_balances)
+        simplified_balances_df = simplified_balances_df.sort_values(by="from").reset_index(drop=True)
+        return simplified_balances_df      
 
     def cal_receive_pay_summary(self, balanceDf):
         ### cal everyone total pay
@@ -136,8 +163,12 @@ class ExpenseSplitter:
         """
         顯示結餘狀態
         """
-        balanceDf = self.calculate_balances()
+        resultDf = self.make_bill_relation()
+        balanceDf = self.cal_all_item_bill(resultDf)
+        simplifiedDf = self.cal_simplified_balances(resultDf)
         finalSummary = self.cal_receive_pay_summary(balanceDf)
+
+        self.expensesDf.to_csv("./raw_data.csv", encoding='utf_8_sig', index=False)
 
         ### print result
         print("============= Split Payment Details =============")
@@ -151,8 +182,25 @@ class ExpenseSplitter:
             else:
                 prevName = row['from']
                 print("\n")
+                print(f"{row['from']} pay {row['to']} {row['total_amount']} dollars, Items: {row['detailed_items']}")
 
         print("\n\n\n")
+
+        print("============= Simplified Payment Details =============")
+        prevName = None
+        for _, row in simplifiedDf.iterrows():
+            if prevName is None:
+                prevName = row['from']
+
+            if prevName == row['from']:
+                print(f"{row['from']} pay {row['to']} {row['amount']} dollars")
+            else:
+                prevName = row['from']
+                print("\n")
+                print(f"{row['from']} pay {row['to']} {row['amount']} dollars")
+
+        print("\n\n\n")
+
         print("============= Summary money =============")
         for _, row in finalSummary.iterrows():
             print(f"{row['Name']}, Balance {row['Sum']}, receive {row['total_received']}, pay {row['total_paid']} dollars")
@@ -168,22 +216,25 @@ if __name__ == "__main__":
 
     ### add payment
     splitter.add_expense("Will", 550, "晚餐素", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("靄晴", 240, "豆花", ["Finn", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
+    splitter.add_expense("Will", 190, "黑糖糕", ["陳昕"])
+    splitter.add_expense("Will", 380, "六晚餐菜", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Finn", 10800, "房費", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Finn", 471, "餅乾", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Finn", 78, "雞蛋", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Finn", 1308, "食材葷", ["Finn", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Finn", 578, "食材牛", ["Finn", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "Leon"])
-    splitter.add_expense("Finn", 772, "江油錢", ["Finn", "靄晴", "陳昕", "張慈"])
+    splitter.add_expense("Finn", 386, "江油錢去", ["Finn", "陳昕", "張慈"])
+    splitter.add_expense("Finn", 386, "江油錢回", ["Finn", "靄晴", "陳昕", "張慈"])
+    splitter.add_expense("Finn", 34, "A 菜心", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Garmin", 480, "Garmin車油錢", ["Garmin", "Ruby", "Will", "阿哲"])
     splitter.add_expense("Garmin", 4700, "Garmin租車錢", ["Will", "阿哲", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
     splitter.add_expense("陳昕", 250, "高麗菜薑", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Will", 190, "黑糖糕", ["陳昕"])
     splitter.add_expense("陳昕", 100, "爬山停車費", ["Finn", "陳昕", "張慈"])
     splitter.add_expense("靄晴", 50, "老街停車費", ["Finn", "靄晴", "陳昕", "張慈"])
+    splitter.add_expense("靄晴", 240, "豆花", ["Finn", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
     splitter.add_expense("阿哲", 150, "爬山老街停車費", ["Garmin", "Ruby", "Will", "阿哲"])
-    splitter.add_expense("Will", 380, "六晚餐菜", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Ruby", 34, "A 菜心", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
+    splitter.add_expense("Leon", 900, "食材(素)", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
+    splitter.add_expense("Ruby", 34, "A 菜心", ["Finn"])
 
     ### output result
     splitter.display_balances()
