@@ -1,96 +1,44 @@
-from flask import Flask, render_template, request, jsonify
-import pandas as pd
+from flask import Flask, request, jsonify, render_template
+from function import ExpenseSplitter
 
 app = Flask(__name__)
+splitter = ExpenseSplitter(participants=["A", "B", "C"])
 
-class ExpenseSplitter:
-    def __init__(self, participants, digit=0):
-        self.digit = digit
-        self.participants = participants
-        columns = ['payer', 'amount', 'item'] + participants + ['pay_' + name for name in participants]
-        self.expensesDf = pd.DataFrame(columns=columns)
-        self.billDf = pd.DataFrame(0, index=participants, columns=participants)
-    
-    def add_expense(self, payer, amount, item, participants):
-        peopleCont = 0
-        expenseData = {'payer': [payer], 'amount': [amount], 'item': [item]}
-        for participant in self.participants:
-            if participant in participants:
-                expenseData[participant] = [1]
-                peopleCont += 1
-            else:
-                expenseData[participant] = [0]
-        
-        if self.digit == 0:
-            money = int(expenseData['amount'][0] / peopleCont)
-        else:
-            money = round(expenseData['amount'][0] / peopleCont, self.digit)
+@app.route("/")
+def index():
+    # Render the HTML file (放在 templates 資料夾中)
+    return render_template("home.html")
 
-        for participant in self.participants:
-            if participant in participants:
-                expenseData['pay_' + participant] = [money]
-            else:
-                expenseData['pay_' + participant] = [0]
+@app.route("/add_participant", methods=["POST"])
+def add_participant():
+    data = request.json
+    participant = data["participant"]
+    splitter.add_participant(participant)
+    return jsonify({"message": f"Participant '{participant}' added successfully"})
 
-        self.expensesDf = pd.concat([self.expensesDf, pd.DataFrame(expenseData)], ignore_index=True)
+@app.route("/delete_participant", methods=["POST"])
+def delete_participant():
+    data = request.json
+    participant = data["participant"]
+    splitter.delete_participant(participant)
+    return jsonify({"message": f"Participant '{participant}' deleted successfully"})
 
-    def calculate_balances(self):
-        paymentsBlanceDf = pd.DataFrame()
-        for payer, tmpDf in self.expensesDf.groupby(['payer']):
-            for person in self.participants:
-                paymentsBlanceDf[person] = tmpDf[f"pay_{person}"].sum()
+@app.route("/get_participants", methods=["GET"])
+def get_participants():
+    return jsonify({"participants": splitter.get_participant()})
 
-        transactions = []
-        for _, row in self.expensesDf.iterrows():
-            payer = row["payer"]; item = row["item"]
-            for person in self.participants:
-                amountToPay = row[f"pay_{person}"]
-                transactions.append({"from": person, "to": payer, "amount": amountToPay, "item": item})
-        resultDf = pd.DataFrame(transactions)
-        resultDf = resultDf[resultDf["amount"] > 0]
-        
-        balanceDf = (
-            resultDf.groupby(["from", "to"])
-                .apply(lambda group: pd.Series({
-                "total_amount": group["amount"].sum(),
-                "detailed_items": self.aggregate_items(group),
-            })).reset_index()
-        )
-        return balanceDf
+@app.route("/refresh_expenses", methods=["POST"])
+def refresh_expenses():
+    splitter.refresh_expenses()
+    return jsonify({"message": "All expenses have been refreshed"})
 
-    def aggregate_items(self, group):
-        itemsSummary = {}
-        for _, row in group.iterrows():
-            item = row["item"]
-            amount = row["amount"]
-            if item in itemsSummary:
-                itemsSummary[item] += amount
-            else:
-                itemsSummary[item] = amount
-        return ", ".join(f"{item}: {amount}" for item, amount in itemsSummary.items())
+@app.route("/delete_expense", methods=["POST"])
+def delete_expense():
+    data = request.json
+    index = data["index"]
+    splitter.delete_expense(index)
+    return jsonify({"message": f"Expense at index {index} deleted successfully"})
 
-
-# 初始化分帳程式
-expense_splitter = ExpenseSplitter(participants=["Alice", "Bob", "Charlie"])
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-@app.route('/add_expense', methods=['POST'])
-def add_expense():
-    payer = request.form.get('payer')
-    amount = float(request.form.get('amount'))
-    item = request.form.get('item')
-    participants = request.form.getlist('participants')
-
-    expense_splitter.add_expense(payer, amount, item, participants)
-    return jsonify({"message": "Expense added successfully!"})
-
-@app.route('/calculate_balances', methods=['GET'])
-def calculate_balances():
-    balanceDf = expense_splitter.calculate_balances()
-    return jsonify(balanceDf.to_dict(orient="records"))
 
 if __name__ == "__main__":
     app.run(debug=True)

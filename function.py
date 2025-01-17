@@ -14,6 +14,35 @@ class ExpenseSplitter:
         columns = ['payer', 'amount', 'item'] + participants + ['receive_from_' + name for name in participants]
         self.expensesDf = pd.DataFrame(columns=columns)
     
+    def add_participant(self, participant):
+        """
+        新增參與者，並更新支出記錄的欄位
+        :param participant: 新的參與者名稱 (str)
+        """
+        if participant not in self.participants:
+            self.participants.append(participant)
+            self.expensesDf[participant] = 0
+            self.expensesDf['receive_from_' + participant] = 0
+
+    def delete_participant(self, participant):
+        """
+        刪除參與者，並更新支出記錄的欄位
+        :param participant: 要刪除的參與者名稱 (str)
+        """
+        if participant in self.participants:
+            self.participants.remove(participant)
+            self.expensesDf = self.expensesDf.drop(columns=[participant, 'receive_from_' + participant])
+
+    def get_participant(self):
+        return self.participants
+    
+    def refresh_expenses(self):
+        """
+        清空所有支出記錄
+        """
+        columns = ['payer', 'amount', 'item'] + self.participants + ['receive_from_' + name for name in self.participants]
+        self.expensesDf = pd.DataFrame(columns=columns)
+
     def add_expense(self, payer, amount, item, participants):
         """
         新增一筆支出記錄，並標註參與者
@@ -34,7 +63,7 @@ class ExpenseSplitter:
                 expenseData[participant] = [0]
         
         if self.digit == 0:
-            if expenseData['amount'][0] % peopleCont != 0:
+            if expenseData['amount'][0] % peopleCont >= 5:
                 money = int(expenseData['amount'][0] / peopleCont) + 1
             else:
                 money = int(expenseData['amount'][0] / peopleCont)
@@ -51,8 +80,16 @@ class ExpenseSplitter:
 
         ### add this bill to DF
         self.expensesDf = pd.concat([self.expensesDf, pd.DataFrame(expenseData)], ignore_index=True)
-    
-    def aggregate_items(self, group):
+
+    def delete_expense(self, index):
+        """
+        根據索引刪除指定支出記錄
+        :param index: 欲刪除的支出記錄索引 (int)
+        """
+        if 0 <= index < len(self.expensesDf):
+            self.expensesDf = self.expensesDf.drop(index=index).reset_index(drop=True)
+
+    def __aggregate_items(self, group):
         itemsSummary = {}
         for _, row in group.iterrows():
             item = row["item"]
@@ -67,7 +104,7 @@ class ExpenseSplitter:
             return ", ".join(f"{item}: {amount}" for item, amount in itemsSummary.items())
         else:
             return ", ".join(f"{item}: {amount:.{self.digit}f}" for item, amount in itemsSummary.items())
-            
+                    
     def make_bill_relation(self):
         """
         計算每位參與者的結餘
@@ -92,38 +129,39 @@ class ExpenseSplitter:
             resultDf.groupby(["from", "to"])
                 .apply(lambda group: pd.Series({
                 "total_amount": group["amount"].sum(),
-                "detailed_items": self.aggregate_items(group),
+                "detailed_items": self.__aggregate_items(group),
             })).reset_index()
         )    
 
         return balanceDf
     
     def cal_simplified_balances(self, resultDf):
-        # 簡化交易：計算淨額
-        net_balances = {}
+        ### 建 receiver & payer Dict
+        balancesDict = {}
         for _, row in resultDf.iterrows():
             key = (row["from"], row["to"])
-            if key not in net_balances:
-                net_balances[key] = 0
-            net_balances[key] += row["amount"]
+            if key not in balancesDict:
+                balancesDict[key] = 0
+            balancesDict[key] += row["amount"]
 
-        # 反向消除雙向交易
-        simplified_balances = []
-        for (payer, receiver), amount in net_balances.items():
-            reverse_key = (receiver, payer)
-            if reverse_key in net_balances:
-                if net_balances[reverse_key] > amount:
-                    net_balances[reverse_key] -= amount
+        ### 消除雙向付款
+        ### EX: A -> B: 90$, B -> A: 40$ --> final: A -> B: 50$
+        simplifiedBalancesList = []
+        for (payer, receiver), amount in balancesDict.items():
+            reverseKey = (receiver, payer)
+            if reverseKey in balancesDict:
+                if balancesDict[reverseKey] > amount:
+                    balancesDict[reverseKey] -= amount
                     amount = 0
                 else:
-                    amount -= net_balances[reverse_key]
-                    net_balances[reverse_key] = 0
+                    amount -= balancesDict[reverseKey]
+                    balancesDict[reverseKey] = 0
             if amount > 0:
-                simplified_balances.append({"from": payer, "to": receiver, "amount": amount})
+                simplifiedBalancesList.append({"from": payer, "to": receiver, "amount": amount})
 
-        simplified_balances_df = pd.DataFrame(simplified_balances)
-        simplified_balances_df = simplified_balances_df.sort_values(by="from").reset_index(drop=True)
-        return simplified_balances_df      
+        simplifiedBalancesDf = pd.DataFrame(simplifiedBalancesList)
+        simplifiedBalancesDf = simplifiedBalancesDf.sort_values(by="from").reset_index(drop=True)
+        return simplifiedBalancesDf      
 
     def cal_receive_pay_summary(self, balanceDf):
         ### cal everyone total pay
@@ -233,7 +271,7 @@ if __name__ == "__main__":
     splitter.add_expense("靄晴", 50, "老街停車費", ["Finn", "靄晴", "陳昕", "張慈"])
     splitter.add_expense("靄晴", 240, "豆花", ["Finn", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
     splitter.add_expense("阿哲", 150, "爬山老街停車費", ["Garmin", "Ruby", "Will", "阿哲"])
-    splitter.add_expense("Leon", 900, "食材(素)", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
+    splitter.add_expense("Leon", 990, "食材(素)", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
     splitter.add_expense("Ruby", 34, "A 菜心", ["Finn"])
 
     ### output result
