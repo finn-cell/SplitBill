@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template
-from function import ExpenseSplitter
+from splitter import ExpenseSplitter
 
 app = Flask(__name__)
 splitter = ExpenseSplitter(participants=["A", "B", "C"])

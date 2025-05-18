@@ -2,6 +2,12 @@ import pandas as pd
 import warnings
 warnings.filterwarnings("ignore")
 
+### TODO:
+### 葷素系統
+### UI
+### 日期
+### 分帳比例
+
 class ExpenseSplitter:
     def __init__(self, participants, digit=0):
         """
@@ -14,15 +20,15 @@ class ExpenseSplitter:
         columns = ['payer', 'amount', 'item'] + participants + ['receive_from_' + name for name in participants]
         self.expensesDf = pd.DataFrame(columns=columns)
     
-    def add_participant(self, participant):
+    def add_participant(self, name):
         """
         新增參與者，並更新支出記錄的欄位
         :param participant: 新的參與者名稱 (str)
         """
-        if participant not in self.participants:
-            self.participants.append(participant)
-            self.expensesDf[participant] = 0
-            self.expensesDf['receive_from_' + participant] = 0
+        if name not in self.participants:
+            self.participants.append(name)
+            self.expensesDf[name] = 0
+            self.expensesDf['receive_from_' + name] = 0
 
     def delete_participant(self, participant):
         """
@@ -34,6 +40,7 @@ class ExpenseSplitter:
             self.expensesDf = self.expensesDf.drop(columns=[participant, 'receive_from_' + participant])
 
     def get_participant(self):
+        print(f"All participants {self.participants}")
         return self.participants
     
     def refresh_expenses(self):
@@ -219,10 +226,10 @@ class ExpenseSplitter:
                 print(f"{row['from']} pay {row['to']} {row['total_amount']} dollars, Items: {row['detailed_items']}")
             else:
                 prevName = row['from']
-                print("\n")
+                print("--------------------")
                 print(f"{row['from']} pay {row['to']} {row['total_amount']} dollars, Items: {row['detailed_items']}")
 
-        print("\n\n\n")
+        print("\n\n")
 
         print("============= Simplified Payment Details =============")
         prevName = None
@@ -234,10 +241,10 @@ class ExpenseSplitter:
                 print(f"{row['from']} pay {row['to']} {row['amount']} dollars")
             else:
                 prevName = row['from']
-                print("\n")
+                print("--------------------")
                 print(f"{row['from']} pay {row['to']} {row['amount']} dollars")
 
-        print("\n\n\n")
+        print("\n\n")
 
         print("============= Summary money =============")
         for _, row in finalSummary.iterrows():
@@ -246,33 +253,48 @@ class ExpenseSplitter:
 
 # 主程式
 if __name__ == "__main__":
-    participants = ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"]  # 設置參與者
+    participants = ["Finn", "Will", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"]  # 設置參與者
     splitter = ExpenseSplitter(participants)
+
+    splitter.add_participant("HI")
+    splitter.get_participant()
 
     print("============= Who join split bill =============")
     print(participants, "\n\n\n")
 
     ### add payment
-    splitter.add_expense("Will", 550, "晚餐素", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Will", 190, "黑糖糕", ["陳昕"])
-    splitter.add_expense("Will", 380, "六晚餐菜", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Finn", 10800, "房費", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Finn", 471, "餅乾", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Finn", 78, "雞蛋", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Finn", 1308, "食材葷", ["Finn", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Finn", 578, "食材牛", ["Finn", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "Leon"])
-    splitter.add_expense("Finn", 386, "江油錢去", ["Finn", "陳昕", "張慈"])
-    splitter.add_expense("Finn", 386, "江油錢回", ["Finn", "靄晴", "陳昕", "張慈"])
-    splitter.add_expense("Finn", 34, "A 菜心", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Garmin", 480, "Garmin車油錢", ["Garmin", "Ruby", "Will", "阿哲"])
-    splitter.add_expense("Garmin", 4700, "Garmin租車錢", ["Will", "阿哲", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
-    splitter.add_expense("陳昕", 250, "高麗菜薑", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("陳昕", 100, "爬山停車費", ["Finn", "陳昕", "張慈"])
-    splitter.add_expense("靄晴", 50, "老街停車費", ["Finn", "靄晴", "陳昕", "張慈"])
-    splitter.add_expense("靄晴", 240, "豆花", ["Finn", "Garmin", "Ruby", "靄晴", "陳昕", "張慈"])
-    splitter.add_expense("阿哲", 150, "爬山老街停車費", ["Garmin", "Ruby", "Will", "阿哲"])
-    splitter.add_expense("Leon", 990, "食材(素)", ["Finn", "Will", "阿哲", "Garmin", "鴻瑋", "Ruby", "靄晴", "陳昕", "張慈", "Leon"])
-    splitter.add_expense("Ruby", 34, "A 菜心", ["Finn"])
+    splitter.add_expense("阿哲", 250, "大林臭豆腐", ["Finn", "阿哲", "Ruby"])
+    splitter.add_expense("阿哲", 320, "晚餐熱炒", ["Finn", "阿哲", "Ruby", "Will"])
+    splitter.add_expense("阿哲", 50, "蒸餃", ["Finn", "阿哲", "Ruby"])
+    splitter.add_expense("阿哲", 50, "涼麵", ["Will"])
+    splitter.add_expense("阿哲", 25, "涼麵果汁", ["Ruby"])
+    splitter.add_expense("阿哲", 105, "大林臭豆腐+大腸豬血湯", ["Finn", "Ruby"])
+    splitter.add_expense("Will", 50, "馬鈴薯玉米筍", ["Finn", "阿哲", "Ruby", "Will"])
+    
+    splitter.add_expense("Ruby", 200, "螢火蟲門票", ["Finn", "阿哲", "Ruby", "Will"])
+    splitter.add_expense("Ruby", 100, "咖哩", ["Finn", "阿哲", "Ruby", "Will"])
+    splitter.add_expense("Ruby", 250, "抹茶芋頭捲", ["Finn", "Will", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Ruby", 760, "雞肉飯", ["Finn", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Ruby", 60, "酪梨牛奶", ["Finn"])
+    splitter.add_expense("Ruby", 50, "鴨肉羹", ["Ruby", "Finn"])
+
+    splitter.add_expense("Finn", 100, "炸物", ["Finn", "阿哲", "Ruby"])
+    splitter.add_expense("Finn", 190, "鴨肉羹", ["Finn", "阿哲", "Ruby"])    
+    splitter.add_expense("Finn", 800, "阿里山門票", ["Finn", "阿哲", "Ruby", "Will"])
+    splitter.add_expense("Finn", 1126, "阿里山晚餐 - 葷", ["Finn", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Finn", 824, "阿里山晚餐 - 素", ["Finn", "Will", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Finn", 520, "鹹酥雞", ["Finn", "Will", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Finn", 180, "鴻瑋蛋糕", ["Finn", "Will", "阿哲", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("Finn", 55, "雞肉飯", ["Finn", "鴻瑋"])
+    splitter.add_expense("Finn", 100, "停車費", ["Finn", "阿哲", "Ruby", "Will"])
+    splitter.add_expense("Finn", 1575, "油錢", ["Finn", "阿哲", "Ruby", "Will"])
+
+    splitter.add_expense("鴻瑋", 13320, "兩天住宿", ["Finn", "Will", "阿哲", "鴻瑋", "Ruby", "181", "帥哥", "佳詠"])
+    splitter.add_expense("佳詠", 40, "飲料", ["Finn"])
+
+    # splitter.add_expense("Finn", 560, "油錢 (嘉義 -> 台北)", ["Finn", "阿哲", "Ruby", "Will"])
+    # splitter.add_expense("Finn", 380, "油錢 (阿里山上下山)", ["Finn", "阿哲", "Ruby", "Will"])
+    # splitter.add_expense("Finn", 635, "油錢 (台北 -> 嘉義)", ["Finn", "阿哲", "Ruby", "Will"])
 
     ### output result
     splitter.display_balances()
