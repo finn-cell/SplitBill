@@ -2,14 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Expense Splitter</title>
-  <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+  <title>{% block title %}Expense Splitter{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-900">
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">🧾 分帳系統 TEST</h1>
+  <nav class="bg-white shadow mb-6 p-4 flex gap-4 text-blue-600 font-semibold">
+    <a href="/users">👥 使用者管理</a>
+    <a href="/add_bill">🧾 新增帳目</a>
+    <a href="/summary">📊 結算頁面</a>
+  </nav>
+
+  <main class="container mx-auto px-4">
     {% block content %}{% endblock %}
-  </div>
+  </main>
 </body>
 </html>

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}結算頁面{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">📊 結算結果</h1>
+
+<table class="w-full table-auto border">
+  <thead>
+    <tr class="bg-gray-200">
+      <th class="border px-2">使用者</th>
+      <th class="border px-2">總支出</th>
+      <th class="border px-2">總收入</th>
+      <th class="border px-2">結餘</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in summary %}
+    <tr class="text-center">
+      <td class="border px-2">{{ row.Name }}</td>
+      <td class="border px-2">{{ row.total_paid }}</td>
+      <td class="border px-2">{{ row.total_received }}</td>
+      <td class="border px-2">
+        {% if row.Sum > 0 %}
+        <span class="text-green-600">+{{ row.Sum }}</span>
+        {% elif row.Sum < 0 %}
+        <span class="text-red-600">{{ row.Sum }}</span>
+        {% else %}
+        0
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="text-xl font-semibold mt-6 mb-2">🔁 簡化後的付款建議</h2>
+<table class="w-full table-auto border">
+  <thead class="bg-gray-200">
+    <tr>
+      <th class="border px-2">付款人</th>
+      <th class="border px-2">收款人</th>
+      <th class="border px-2">金額</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in simplified %}
+    <tr class="text-center">
+      <td class="border px-2">{{ row.from }}</td>
+      <td class="border px-2">{{ row.to }}</td>
+      <td class="border px-2">{{ row.amount }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

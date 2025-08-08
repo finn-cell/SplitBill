@@ -5,12 +5,8 @@ warnings.filterwarnings("ignore")
 ### TODO:
 ### 葷素系統
 ### UI
-### 日期, 時間
+### 日期
 ### 分帳比例
-### 分帳 Note
-### 多人付款
-### 詳細帳本計算過程
-### 帳本依日期、順序、人名排列
 
 class ExpenseSplitter:
     def __init__(self, participants, digit=0):
@@ -138,9 +134,6 @@ class ExpenseSplitter:
         計算每位參與者的結餘
         :return: 每位參與者的結餘 (DataFrame)
         """
-        if self.expensesDf.empty:
-            return pd.DataFrame(columns=["from", "to", "amount", "item"])
-        
         ### 把錢 summary -> 誰 pay 誰 多少錢，有什麼 Item
         transactions = []
         for _, row in self.expensesDf.iterrows():

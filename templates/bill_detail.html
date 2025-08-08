@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}帳目詳細資訊{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">📄 {{ item }} - 詳細資訊</h1>
+
+<p class="mb-4">
+  <span class="font-semibold">{{ payer }}</span> 支付了 
+  <span class="font-semibold">{{ amount }}</span> 元。
+</p>
+
+<table class="w-full table-auto border">
+  <thead class="bg-gray-200">
+    <tr>
+      <th class="border px-2 py-1">參與者</th>
+      <th class="border px-2 py-1">應付金額</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in details %}
+    <tr class="text-center">
+      <td class="border px-2 py-1">{{ d.participant }}</td>
+      <td class="border px-2 py-1">{{ d.amount }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a href="/add_bill" class="inline-block mt-4 text-blue-600 underline">← 回帳目列表</a>
+{% endblock %}

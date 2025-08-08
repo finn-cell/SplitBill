@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expense Splitter</title>
+  <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">🧾 分帳系統 TEST</h1>
+
+    <!-- 新增使用者 -->
+    <form action="/add_user" method="post" class="mb-4">
+      <label class="block mb-2 font-semibold">新增使用者</label>
+      <input name="participant" required class="border px-2 py-1 mr-2" placeholder="使用者名稱">
+      <button class="bg-blue-500 text-white px-4 py-1 rounded">新增</button>
+    </form>
+
+    <!-- 使用者列表 -->
+    <div class="mb-8">
+      <h2 class="text-xl font-semibold mb-2">使用者列表</h2>
+      <ul>
+        {% for p in participants %}
+        <li class="mb-1">
+          {{ p }}
+          <form action="/delete_user" method="post" class="inline">
+            <input type="hidden" name="participant" value="{{ p }}">
+            <button class="text-red-500 ml-2">刪除</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- 新增帳單 -->
+    <form action="/add_bill" method="post" class="mb-4">
+      <h2 class="text-xl font-semibold mb-2">新增帳單</h2>
+      <div class="mb-2">
+        <label>付款人：</label>
+        <select name="payer" class="border px-2 py-1">
+          {% for p in participants %}
+          <option value="{{ p }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-2">
+        <label>金額：</label>
+        <input name="amount" type="number" step="0.01" required class="border px-2 py-1">
+      </div>
+      <div class="mb-2">
+        <label>項目：</label>
+        <input name="item" required class="border px-2 py-1">
+      </div>
+      <div class="mb-2">
+        <label>參與者：</label><br>
+        {% for p in participants %}
+        <label class="mr-4">
+          <input type="checkbox" name="participants" value="{{ p }}"> {{ p }}
+        </label>
+        {% endfor %}
+      </div>
+      <button class="bg-green-500 text-white px-4 py-1 rounded">新增帳單</button>
+    </form>
+
+    <!-- 帳單列表 -->
+    <div class="mt-6">
+      <h2 class="text-xl font-semibold mb-2">所有帳單</h2>
+      <table class="w-full table-auto border">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border px-2">索引</th>
+            <th class="border px-2">付款人</th>
+            <th class="border px-2">金額</th>
+            <th class="border px-2">項目</th>
+            <th class="border px-2">參與者</th>
+            <th class="border px-2">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for expense in expenses %}
+          <tr class="text-center">
+            <td class="border px-2">{{ loop.index0 }}</td>
+            <td class="border px-2">{{ expense["payer"] }}</td>
+            <td class="border px-2">{{ expense["amount"] }}</td>
+            <td class="border px-2">{{ expense["item"] }}</td>
+            <td class="border px-2">{{ expense["participants"] | join(", ") }}</td>
+            <td class="border px-2">
+              <form action="/delete_bill" method="post">
+                <input type="hidden" name="idx" value="{{ loop.index0 }}">
+                <button class="text-red-500">刪除</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
